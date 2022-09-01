@@ -63,7 +63,7 @@ uint8_t rdt = 10;
 uint8_t rxdata[2] = { 0, };
 uint8_t rxDataPC[RXBUF_SIZE] = { 0, }; //Serial communication
 uint8_t command = 0;
-uint8_t control = 0;
+float control = 0;
 
 /* USER CODE END PV */
 
@@ -132,7 +132,7 @@ int main(void) {
 		if (command) {
 			command = 0;
 			if ((rxDataPC[0] == 'S') & (rxDataPC[1] == 'S')) {
-				I=0;
+				I = 0;
 				for (int num = 0; num < 3; num++) {
 					str_speed[num] = rxDataPC[num + 3];
 				} //degree setting
@@ -149,6 +149,15 @@ int main(void) {
 			control = PID(target_speed, current_speed);
 			TIM2->CCR1 = TIM2->ARR * (fabs(control) > 1.0 ? 1 : fabs(control));
 			HAL_GPIO_WritePin(MOTOR_DIR_GPIO_Port, MOTOR_DIR_Pin, control > 0);
+
+			static int count = 0;
+			if (count == 5) {
+				sprintf((char*) tx_buffer, "%.3f,%.3f,%f,%u\r\n", target_speed,
+						 current_speed, control, TIM2->CCR1);
+				tx_com(tx_buffer, strlen((char const*) tx_buffer));
+				count = 0;
+			}
+			count++;
 		}
 	}
 	/* USER CODE END 3 */
