@@ -18,12 +18,13 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "string.h"
-#include "stdio.h"
-#include "math.h"
+
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "motor.h"
+#include "string.h"
+#include "stdio.h"
+#include "math.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -44,26 +45,29 @@
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef htim10;
-
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
 extern float I;
+
 static uint8_t tx_buffer[1000]; //UART
+
 #define CNT_MID 32768
 #define TOTAL_CNT 900
-//#define DIAMETER 2*3.14*DIAMETER
+#define RXBUF_SIZE	6
+
+//#define DIAMETER 2*3.14*DIAMETER //If you have wheel put the wheel's diameter
+
 float target_speed = 0; // for decimal point calculation declar float format
 float current_speed = 0; //
-float motorPwm = 0;
-uint8_t control_period = 0;
+float control = 0;
+
+uint8_t flag_10Hz = 0;
+uint8_t flag_cmd = 0;
 uint8_t rdt = 10;
 
-#define RXBUF_SIZE	6
 uint8_t rxdata[2] = { 0, };
 uint8_t rxDataPC[RXBUF_SIZE] = { 0, }; //Serial communication
-uint8_t command = 0;
-float control = 0;
 
 /* USER CODE END PV */
 
@@ -117,8 +121,8 @@ int main(void) {
 	MX_TIM10_Init();
 	MX_USART2_UART_Init();
 	/* USER CODE BEGIN 2 */
-	HAL_TIM_Encoder_Start(&htim3, TIM_CHANNEL_ALL);
 	HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
+	HAL_TIM_Encoder_Start(&htim3, TIM_CHANNEL_ALL);
 	HAL_GPIO_WritePin(MOTOR_DIR_GPIO_Port, MOTOR_DIR_Pin, SET);
 	TIM3->CNT = CNT_MID;
 	/* USER CODE END 2 */
@@ -129,8 +133,8 @@ int main(void) {
 		/* USER CODE END WHILE */
 
 		/* USER CODE BEGIN 3 */
-		if (command) {
-			command = 0;
+		if (flag_cmd) {
+			flag_cmd = 0;
 			if ((rxDataPC[0] == 'S') & (rxDataPC[1] == 'S')) {
 				I = 0;
 				for (int num = 0; num < 3; num++) {
@@ -142,18 +146,20 @@ int main(void) {
 				}
 			}
 		}
-		if (control_period == 1) {
-			control_period = 0;
+		if (flag_10Hz == 1) {
+			flag_10Hz = 0;
+
 			TIM3->CNT = CNT_MID;
 			current_speed = GET_SPEED();
 			control = PID(target_speed, current_speed);
+
 			TIM2->CCR1 = TIM2->ARR * (fabs(control) > 1.0 ? 1 : fabs(control));
 			HAL_GPIO_WritePin(MOTOR_DIR_GPIO_Port, MOTOR_DIR_Pin, control > 0);
 
 			static int count = 0;
 			if (count == 5) {
-				sprintf((char*) tx_buffer, "%.3f,%.3f,%f,%u\r\n", target_speed,
-						 current_speed, control, TIM2->CCR1);
+				sprintf((char*) tx_buffer, "%.3f,%.3f,%f,%ld\r\n", target_speed,
+						current_speed, control, TIM2->CCR1);
 				tx_com(tx_buffer, strlen((char const*) tx_buffer));
 				count = 0;
 			}
@@ -239,7 +245,7 @@ static void MX_TIM2_Init(void) {
 		Error_Handler();
 	}
 	sConfigOC.OCMode = TIM_OCMODE_PWM1;
-	sConfigOC.Pulse = 5000 - 1;
+	sConfigOC.Pulse = 0;
 	sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
 	sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
 	if (HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_1)
@@ -406,13 +412,7 @@ static void MX_GPIO_Init(void) {
 static void tx_com(uint8_t *tx_buffer, uint16_t len) {
 	HAL_UART_Transmit(&huart2, tx_buffer, len, 100);
 }
-
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
-//	if (huart->Instance == huart2.Instance) {
-//		HAL_UART_Receive_IT(&huart2, &input_degree, 3); //continue receive data from uFlag
-//		uFlag = true;
-//	}
-
 	if (huart->Instance == huart2.Instance) {
 		volatile static uint8_t rxcnt = 0;
 		static uint8_t rxbuf[RXBUF_SIZE]; // cmd :  2, parm :  4
@@ -425,23 +425,22 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 		} else if (rxcnt == (RXBUF_SIZE + 1) && rxdata[0] == '>') {
 			rxcnt = 0;
 			memcpy(rxDataPC, rxbuf, RXBUF_SIZE);
-			command = 1;
+			flag_cmd = 1;
 		} else {
 			rxcnt = 0;
 		}
 		HAL_UART_Receive_IT(&huart2, &rxdata[0], 1); //continue receive data from bluetooth
-	} //7digits char
+	}
 }
-
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 	if (htim->Instance == htim10.Instance) {
-		control_period = 1;
+		flag_10Hz = 1;
 	}
 }
 
 float GET_SPEED() {
 	int gapCNT = (int) TIM3->CNT - CNT_MID;
-//	static float speed = (DIAMETER)(gapCNT/TOTAL_CNT)*rdt; //this variable is for you know your wheel diameter
+//	float speed = (DIAMETER)(gapCNT/TOTAL_CNT)*rdt; //this variable is for you know your wheel diameter
 	float speed = (gapCNT / TOTAL_CNT) * rdt; //this variable is for just CNT ratio.
 	return speed;
 }

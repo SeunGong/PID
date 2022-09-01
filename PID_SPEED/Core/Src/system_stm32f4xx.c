@@ -371,7 +371,7 @@ void SystemInit_ExtMemCtl(void)
   FMC_Bank5_6->SDTR[0] = 0x01115351;      
   
   /* SDRAM initialization sequence */
-  /* Clock enable command */
+  /* Clock enable flag_cmd */
   FMC_Bank5_6->SDCMR = 0x00000011; 
   tmpreg = FMC_Bank5_6->SDSR & 0x00000020; 
   while((tmpreg != 0) && (timeout-- > 0))
@@ -382,7 +382,7 @@ void SystemInit_ExtMemCtl(void)
   /* Delay */
   for (index = 0; index<1000; index++);
   
-  /* PALL command */
+  /* PALL flag_cmd */
   FMC_Bank5_6->SDCMR = 0x00000012;           
   tmpreg = FMC_Bank5_6->SDSR & 0x00000020;
   timeout = 0xFFFF;
@@ -391,7 +391,7 @@ void SystemInit_ExtMemCtl(void)
     tmpreg = FMC_Bank5_6->SDSR & 0x00000020; 
   }
   
-  /* Auto refresh command */
+  /* Auto refresh flag_cmd */
   FMC_Bank5_6->SDCMR = 0x00000073;
   tmpreg = FMC_Bank5_6->SDSR & 0x00000020;
   timeout = 0xFFFF;
@@ -579,7 +579,7 @@ void SystemInit_ExtMemCtl(void)
   FMC_Bank5_6->SDTR[0] = 0x01115351;      
   
   /* SDRAM initialization sequence */
-  /* Clock enable command */
+  /* Clock enable flag_cmd */
   FMC_Bank5_6->SDCMR = 0x00000011; 
   tmpreg = FMC_Bank5_6->SDSR & 0x00000020; 
   while((tmpreg != 0) && (timeout-- > 0))
@@ -590,7 +590,7 @@ void SystemInit_ExtMemCtl(void)
   /* Delay */
   for (index = 0; index<1000; index++);
   
-  /* PALL command */
+  /* PALL flag_cmd */
   FMC_Bank5_6->SDCMR = 0x00000012;           
   tmpreg = FMC_Bank5_6->SDSR & 0x00000020;
   timeout = 0xFFFF;
@@ -599,7 +599,7 @@ void SystemInit_ExtMemCtl(void)
     tmpreg = FMC_Bank5_6->SDSR & 0x00000020; 
   }
   
-  /* Auto refresh command */
+  /* Auto refresh flag_cmd */
 #if defined(STM32F446xx)
   FMC_Bank5_6->SDCMR = 0x000000F3;
 #else  
