@@ -56,11 +56,12 @@ static uint8_t tx_buffer[1000]; //UART
 #define CNT_MID 32768
 #define TOTAL_CNT 26
 #define RXBUF_SIZE	6
+#define DEAD_ZONE
 
 //#define DIAMETER 2*3.14*DIAMETER //If you have wheel put the wheel's diameter
 
-float target_speed = 0; // for decimal point calculation declar float format
-float current_speed = 0; //
+int target_speed = 0; // for decimal point calculation declar float format
+int current_speed = 0; //
 float control = 0;
 
 uint8_t flag_10Hz = 0;
@@ -82,7 +83,7 @@ static void MX_USART2_UART_Init(void);
 /* USER CODE BEGIN PFP */
 static void tx_com(uint8_t *tx_buffer, uint16_t len);
 void SET_PWM(int8_t *speed);
-float GET_SPEED();
+int GET_SPEED();
 //void Clip_Pwm(float *dir_pwm, int32_t min, int32_t max);
 /* USER CODE END PFP */
 
@@ -123,10 +124,15 @@ int main(void)
   MX_TIM10_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
+	HAL_TIM_Base_Start_IT(&htim10);
 	HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
 	HAL_TIM_Encoder_Start(&htim3, TIM_CHANNEL_ALL);
 	HAL_GPIO_WritePin(MOTOR_DIR_GPIO_Port, MOTOR_DIR_Pin, SET);
+	HAL_UART_Receive_IT(&huart2, &rxdata[0], 1);
 	TIM3->CNT = CNT_MID;
+
+	sprintf((char*) tx_buffer, "PID start\r\n");
+					tx_com(tx_buffer, strlen((char const*) tx_buffer));
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -151,21 +157,20 @@ int main(void)
 		if (flag_10Hz == 1) {
 			flag_10Hz = 0;
 
-			TIM3->CNT = CNT_MID;
 			current_speed = GET_SPEED();
-			control = PID(target_speed, current_speed);
+			control += PID(target_speed, current_speed);
 
 			TIM2->CCR1 = TIM2->ARR * (fabs(control) > 1.0 ? 1 : fabs(control));
 			HAL_GPIO_WritePin(MOTOR_DIR_GPIO_Port, MOTOR_DIR_Pin, control > 0);
 
-			static int count = 0;
-			if (count == 5) {
-				sprintf((char*) tx_buffer, "%.3f,%.3f,%f,%ld\r\n", target_speed,
+//			static int count = 0;
+//			if (count == 5) {
+				sprintf((char*) tx_buffer, "%d,%d,%f,%ld\r\n", target_speed,
 						current_speed, control, TIM2->CCR1);
 				tx_com(tx_buffer, strlen((char const*) tx_buffer));
-				count = 0;
-			}
-			count++;
+//				count = 0;
+//			}
+//			count++;
 		}
 	}
   /* USER CODE END 3 */
@@ -331,7 +336,7 @@ static void MX_TIM10_Init(void)
 
   /* USER CODE END TIM10_Init 1 */
   htim10.Instance = TIM10;
-  htim10.Init.Prescaler = 8400-1;
+  htim10.Init.Prescaler = 840-1;
   htim10.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim10.Init.Period = 1000-1;
   htim10.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
@@ -452,10 +457,12 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 	}
 }
 
-float GET_SPEED() {
-	int gapCNT = (int) TIM3->CNT - CNT_MID;
+int GET_SPEED() {
+	int gapCNT = TIM3->CNT - CNT_MID;
+//	int gapCNT = TIM3->CNT;
 //	float speed = (DIAMETER)(gapCNT/TOTAL_CNT)*rdt; //this variable is for you know your wheel diameter
-	float speed = gapCNT; //this variable is for just CNT ratio.
+	int speed = gapCNT; //this variable is for just CNT ratio.
+	TIM3->CNT = CNT_MID;
 	return speed;
 }
 /* USER CODE END 4 */

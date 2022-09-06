@@ -6,8 +6,8 @@
  */
 
 //Coefficient Kp,Ki,Kd
-float Kp = 0.0;
-float Ki = 0.0;
+float Kp = 0.001;
+float Ki = 0.0001;
 float Kd = 0.0;
 
 float P, I = 0, D;
@@ -15,7 +15,7 @@ float error = 0, preError = 0;
 float dt = 0.1;
 extern uint8_t rdt; //[reverse dt] If dt=0.1s this is reverse variable for cacluation.
 
-float PID(float target, float current) {
+float PID(int target, int current) {
 	error = (float) (target - current);
 	P = Kp * error;
 	I += Ki * error * dt;
